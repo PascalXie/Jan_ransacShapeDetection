@@ -1,0 +1,28 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/pascal/workshop/Jan_ransacShapeDetection/step5-cgalCMake/main.cpp
+fstream
+-
+iostream
+-
+string
+-
+CGAL/Timer.h
+-
+CGAL/number_utils.h
+-
+CGAL/property_map.h
+-
+CGAL/IO/read_xyz_points.h
+-
+CGAL/Exact_predicates_inexact_constructions_kernel.h
+-
+CGAL/Shape_detection/Efficient_RANSAC.h
+-
+
