@@ -49,6 +49,18 @@ int main(int argc, char** argv) {
 		return EXIT_FAILURE;
 	}
 
+	// point cloud check
+	cout<<"points.size(): "<<points.size()<<endl;
+
+	for(int i=0;i<points.size();i++)
+	{
+		Kernel::Point_3		p = points[i].first;
+		Kernel::Vector_3	v = points[i].second;
+		cout<<"Point ID: "<<i<<"; point: "<<p.x()<<", "<<p.y()<<", "<<p.z()<<"; ";
+		cout<<"Normal: "<<v.x()<<", "<<v.y()<<", "<<v.z()<<endl;
+	}
+
+
 	// Instantiate shape detection engine.
 	Efficient_ransac ransac;
 
