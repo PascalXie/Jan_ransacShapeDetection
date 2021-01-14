@@ -28,8 +28,11 @@ class Histogram3D
 		void	Fill(double x, double y, double z, double weight);
 		void	GetBinCentor(int IDx, int IDy, int IDz, double &x, double &y, double &z);
 		double	GetBinCounts(int IDx, int IDy, int IDz);
+		void	SetBinCounts(int IDx, int IDy, int IDz, double counts);
 		int		GetID(int IDx, int IDy, int IDz);
+		void	Normalize();
 		void	Show();
+
 	
 	private:
 		int binx_;
@@ -133,10 +136,46 @@ double	Histogram3D::GetBinCounts(int IDx, int IDy, int IDz)
 	return counts;
 }
 
+void Histogram3D::SetBinCounts(int IDx, int IDy, int IDz, double counts)
+{
+	int ID = GetID(IDx, IDy, IDz);
+	Hist_[ID] = counts;
+
+	return;
+}
+
 int Histogram3D::GetID(int IDx, int IDy, int IDz)
 {
 	int ID = IDx*biny_*binz_ + IDy*binz_ + IDz;
 	return ID;
+}
+
+void Histogram3D::Normalize()
+{
+	double TotalCounts = 0;
+
+	for(int i=0;i<binx_;i++)
+	for(int j=0;j<biny_;j++)
+	for(int k=0;k<binz_;k++)
+	{
+		double counts = GetBinCounts(i, j, k);
+		TotalCounts += counts;
+	}
+
+	if(TotalCounts==0)
+		return;
+
+
+	for(int i=0;i<binx_;i++)
+	for(int j=0;j<biny_;j++)
+	for(int k=0;k<binz_;k++)
+	{
+		double counts = GetBinCounts(i, j, k);
+		double normalizedCounts = counts/TotalCounts;
+		SetBinCounts(i, j, k, normalizedCounts);
+	}
+
+	return;
 }
 
 void Histogram3D::Show()
@@ -225,7 +264,7 @@ int main(int argc, char *argv[])
 	cout<<"maxDist : "<<maxDist<<endl;
 	// !get the maximum value of distances
 
-	int N_bin = 10;
+	int N_bin = 50;
 	double min = 0.;
 	double maxx = M_PI; // theta
 	double maxy = 2.*M_PI; // phi
@@ -263,7 +302,135 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	h.Show();
+	h.Normalize();
+	//h.Show();
+
+	//
+	// determine planes that we found by Hough transformation
+	//
+	vector<double> List_theta;
+	vector<double> List_phi;
+	vector<double> List_r;
+
+	double threshold = 0.001;
+	for(int i=0;i<N_bin;i++)
+	for(int j=0;j<N_bin;j++)
+	for(int k=0;k<N_bin;k++)
+	{
+		double counts = h.GetBinCounts(i,j,k);
+		if(counts>threshold)
+		{
+			double x = 0; // theta
+			double y = 0; // phi
+			double z = 0; // r
+			h.GetBinCentor(i, j, k, x, y, z);
+
+			cout<<"Plane - ID(x,y,z): "<<i<<", "<<j<<", "<<k
+				<<"; BinCentor(x,y,z): "<<x<<", "<<y<<", "<<z
+				<<"; Counts: "<<counts<<endl;
+
+			List_theta.push_back(x);
+			List_phi  .push_back(y);
+			List_r    .push_back(z);
+		}
+	}
+
+	//// test
+	//vector<int> vec{1,2,3,4,5,6};
+	//for(auto it = vec.begin(); it != vec.end(); it++)
+	//{
+	//	if(*it == 3)
+	//	{
+	//		it = vec.erase(it);
+	//		if(it==vec.end()) break;
+	//	}
+	//}
+
+	//for(int i=0;i<vec.size();i++)
+	//{
+	//	cout<<"ID: "<<i<<"; value: "<<vec[i]<<endl;
+	//}
+	//// !test
+
+	//
+	// identify points according to the distance to a plane 
+	//
+	vector<int> planeID;
+	// initialize
+	for(int i=0;i<points.size();i++)
+	{
+		planeID.push_back(-1);
+	}
+
+
+	double threshold_planeDist = 100; // mm
+	double threshold_squared_planeDist = pow(threshold_planeDist,2); // mm
+
+	// determine all points
+	for(int i=0;i<points.size();i++)
+	{
+		double x = points[i].x;
+		double y = points[i].y;
+		double z = points[i].z;
+
+		// all planes that have been found are considered
+		vector<double>	List_distance2;
+		vector<int>		List_bestPlaneID;
+		for(int j=0;j<List_theta.size();j++)
+		{
+			double theta = List_theta[j]; // theta
+			double phi   = List_phi  [j]; // phi
+			double r     = List_r    [j]; // r
+
+			double r_est =	x*sin(theta)*cos(phi) 
+					      + y*sin(theta)*sin(phi)
+					      + z*cos(theta);
+			double distance2 = pow(r_est-r,2);
+
+			//cout<<"r_est: "<<r_est<<", r: "<<r<<", distance: "<<sqrt(distance2)<<endl;
+
+			// if the squared distance is smaller than the threshold,
+			// we would consider that this plane is a candidate
+			if(distance2<threshold_squared_planeDist)
+			{
+				List_distance2.push_back(distance2);
+				List_bestPlaneID.push_back(j);
+			}
+		}
+
+		// search the plane that the current point belongs to
+		if(List_distance2.size()==0) continue;
+
+		int bestPlaneID = 0;
+		double bestDistance2 = List_distance2[0];
+		for(int j=0;j<List_distance2.size();j++)
+		{
+			if(bestDistance2>List_distance2[j])
+			{
+				bestPlaneID = j;
+				bestDistance2>List_distance2[j];
+			}
+		}
+		planeID[i] = bestPlaneID;
+	} 
+
+	// output points with planeIDs
+	ofstream fileOut("data_pointsWithShapes.txt");
+	for(int i=0;i<points.size();i++)
+	{
+		int planeIDCur = planeID[i];
+
+		if(planeIDCur==-1) continue;
+
+		double x = points[i].x;
+		double y = points[i].y;
+		double z = points[i].z;
+
+		string PlaneName = to_string(planeIDCur) + "-Pla";
+		fileOut<<PlaneName<<" "<<x<<" "<<y<<" "<<z<<endl;
+	}
+	fileOut.close();
+	
 
 
 
