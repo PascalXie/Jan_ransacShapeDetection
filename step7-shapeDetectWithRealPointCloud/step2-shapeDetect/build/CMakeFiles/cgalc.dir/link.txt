@@ -1,0 +1,1 @@
+/usr/bin/c++    -rdynamic CMakeFiles/cgalc.dir/main.cpp.o  -o cgalc  -lmpfr -lgmp 
